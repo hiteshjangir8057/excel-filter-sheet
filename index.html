@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Excel Data Matcher</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --secondary: #10b981;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+        }
+
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; }
+        
+        /* Header */
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { color: var(--primary); margin: 0; font-size: 2.5rem; }
+        .header p { color: #64748b; margin-top: 10px; }
+
+        /* Step Cards */
+        .card { background: var(--card); padding: 25px; border-radius: 15px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid #e2e8f0; }
+        .step-num { background: var(--primary); color: white; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; margin-right: 10px; font-weight: bold; }
+        .card-title { font-size: 1.25rem; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; }
+
+        /* Grid System */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .control-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 0.9rem; color: #475569; }
+        select, input { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; transition: 0.2s; background: #fff; }
+        select:focus { border-color: var(--primary); ring: 2px solid #c7d2fe; }
+
+        /* Buttons */
+        .btn { cursor: pointer; padding: 12px 24px; border: none; border-radius: 8px; font-weight: 600; font-size: 1rem; transition: 0.3s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-primary { background: var(--primary); color: white; width: 100%; margin-top: 10px; }
+        .btn-primary:hover { background: #4338ca; transform: translateY(-1px); }
+        .btn-success { background: var(--secondary); color: white; }
+        
+        /* Table Styles */
+        .table-container { overflow-x: auto; margin-top: 20px; border-radius: 8px; border: 1px solid #e2e8f0; max-height: 500px; }
+        table { width: 100%; border-collapse: collapse; background: white; font-size: 0.9rem; }
+        th { background: #f1f5f9; position: sticky; top: 0; padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #e2e8f0; }
+        td { padding: 10px; border-bottom: 1px solid #f1f5f9; }
+        tr:hover { background: #f8fafc; }
+        .highlight-col { background: #f0fdf4; font-weight: bold; color: var(--secondary); }
+
+        /* Loading Spinner */
+        #loader { display: none; text-align: center; padding: 20px; font-weight: bold; color: var(--primary); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>Excel SR Matcher Pro</h1>
+        <p>दो अलग-अलग शीट्स के डेटा को मैच करके SR No. निकालने का आसान तरीका</p>
+    </div>
+
+    <!-- Step 1: Upload -->
+    <div class="card">
+        <div class="card-title"><span class="step-num">1</span> Excel फाइल अपलोड करें</div>
+        <input type="file" id="fileInput" accept=".xlsx, .xls">
+    </div>
+
+    <!-- Step 2: Configuration -->
+    <div id="configSection" style="display: none;">
+        <div class="grid">
+            <!-- Main Sheet -->
+            <div class="card">
+                <div class="card-title">Main Sheet (Target)</div>
+                <div class="control-group">
+                    <label>शीट चुनें (जिसमें SR No. भरना है):</label>
+                    <select id="mainSheet"></select>
+                </div>
+                <div class="control-group">
+                    <label>Student Name कॉलम:</label>
+                    <select id="mainName"></select>
+                </div>
+                <div class="control-group">
+                    <label>Father Name कॉलम:</label>
+                    <select id="mainFather"></select>
+                </div>
+            </div>
+
+            <!-- Reference Sheet -->
+            <div class="card">
+                <div class="card-title">Reference Sheet (Source)</div>
+                <div class="control-group">
+                    <label>शीट चुनें (जिससे SR No. उठाना है):</label>
+                    <select id="refSheet"></select>
+                </div>
+                <div class="control-group">
+                    <label>Student Name कॉलम:</label>
+                    <select id="refName"></select>
+                </div>
+                <div class="control-group">
+                    <label>Father Name कॉलम:</label>
+                    <select id="refFather"></select>
+                </div>
+                <div class="control-group">
+                    <label style="color: var(--secondary);">SR No. वाला कॉलम:</label>
+                    <select id="refSRValue" style="border-color: var(--secondary);"></select>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-primary" onclick="processData()">डेटा मैच करें और प्रीव्यू देखें</button>
+    </div>
+
+    <div id="loader">Processing... Please wait...</div>
+
+    <!-- Step 3: Result Table -->
+    <div id="resultSection" class="card" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <div class="card-title" style="margin: 0;">Matched Data Preview</div>
+            <button class="btn btn-success" onclick="downloadExcel()">Excel डाउनलोड करें</button>
+        </div>
+        <div class="table-container">
+            <table id="displayTable">
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    let wb;
+    let finalProcessedData = [];
+
+    // File Selection
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const data = new Uint8Array(event.target.result);
+            wb = XLSX.read(data, {type: 'array'});
+            
+            fillSheets();
+            document.getElementById('configSection').style.display = 'block';
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    function fillSheets() {
+        const mainSheet = document.getElementById('mainSheet');
+        const refSheet = document.getElementById('refSheet');
+        mainSheet.innerHTML = "";
+        refSheet.innerHTML = "";
+
+        wb.SheetNames.forEach(name => {
+            mainSheet.add(new Option(name, name));
+            refSheet.add(new Option(name, name));
+        });
+
+        // Default headers
+        updateHeaders('main');
+        updateHeaders('ref');
+    }
+
+    document.getElementById('mainSheet').addEventListener('change', () => updateHeaders('main'));
+    document.getElementById('refSheet').addEventListener('change', () => updateHeaders('ref'));
+
+    function updateHeaders(type) {
+        const sheetName = document.getElementById(type === 'main' ? 'mainSheet' : 'refSheet').value;
+        const sheet = wb.Sheets[sheetName];
+        const headers = XLSX.utils.sheet_to_json(sheet, {header: 1})[0] || [];
+
+        if (type === 'main') {
+            fillCols(['mainName', 'mainFather'], headers);
+        } else {
+            fillCols(['refName', 'refFather', 'refSRValue'], headers);
+        }
+    }
+
+    function fillCols(ids, headers) {
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            el.innerHTML = "";
+            headers.forEach(h => el.add(new Option(h, h)));
+        });
+    }
+
+    // Matching Logic
+    function processData() {
+        document.getElementById('loader').style.display = 'block';
+        
+        setTimeout(() => {
+            const mainNameCol = document.getElementById('mainName').value;
+            const mainFatherCol = document.getElementById('mainFather').value;
+            const refNameCol = document.getElementById('refName').value;
+            const refFatherCol = document.getElementById('refFather').value;
+            const refSRCol = document.getElementById('refSRValue').value;
+
+            const mainData = XLSX.utils.sheet_to_json(wb.Sheets[document.getElementById('mainSheet').value]);
+            const refData = XLSX.utils.sheet_to_json(wb.Sheets[document.getElementById('refSheet').value]);
+
+            // Create Lookup Map
+            const map = new Map();
+            refData.forEach(row => {
+                const key = clean(row[refNameCol]) + "|" + clean(row[refFatherCol]);
+                map.set(key, row[refSRCol]);
+            });
+
+            // Match
+            finalProcessedData = mainData.map(row => {
+                const key = clean(row[mainNameCol]) + "|" + clean(row[mainFatherCol]);
+                row["Matched_SR_No"] = map.get(key) || "Not Found";
+                return row;
+            });
+
+            displayInTable(finalProcessedData);
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('resultSection').style.display = 'block';
+            window.scrollTo(0, document.body.scrollHeight);
+        }, 500);
+    }
+
+    function clean(val) {
+        return String(val || "").trim().toLowerCase().replace(/\s+/g, ' ');
+    }
+
+    function displayInTable(data) {
+        const head = document.getElementById('tableHead');
+        const body = document.getElementById('tableBody');
+        head.innerHTML = "";
+        body.innerHTML = "";
+
+        if(data.length === 0) return;
+
+        // Headers
+        const keys = Object.keys(data[0]);
+        let hr = "<tr>";
+        keys.forEach(k => hr += `<th>${k}</th>`);
+        hr += "</tr>";
+        head.innerHTML = hr;
+
+        // Rows
+        data.forEach(row => {
+            let tr = "<tr>";
+            keys.forEach(k => {
+                const isSR = k === "Matched_SR_No";
+                tr += `<td class="${isSR ? 'highlight-col' : ''}">${row[k] || ''}</td>`;
+            });
+            tr += "</tr>";
+            body.innerHTML += tr;
+        });
+    }
+
+    function downloadExcel() {
+        const ws = XLSX.utils.json_to_sheet(finalProcessedData);
+        const newWb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(newWb, ws, "Matched_Data");
+        XLSX.writeFile(newWb, "Final_Matched_Report.xlsx");
+    }
+</script>
+
+</body>
+</html>
